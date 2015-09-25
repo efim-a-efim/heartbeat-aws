@@ -1,0 +1,40 @@
+#!/bin/sh
+
+. /etc/ha.d/resource.d//hto-mapfuncs
+
+usage() {
+    echo "usage: $0 route-table-id desctiantion-cdir-block interface AWS_IAM_ROLE $LEGAL_ACTIONS"
+    exit 1
+}
+
+# Check the arguments passed to this script
+if [ $# -lt 3 ]; then
+    usage
+fi
+
+if [ "x$2" != "x" ]; then
+    OCF_RESKEY_table="$1"; shift
+    export OCF_RESKEY_table
+fi
+
+if [ "x$2" != "x" ]; then
+    OCF_RESKEY_destination="$1"; shift
+    export OCF_RESKEY_destination
+fi
+
+
+if [ "x$2" != "x" ]; then
+    OCF_RESKEY_interface="$1"; shift
+    export OCF_RESKEY_interface
+fi
+
+if [ "x$2" != "x" ]; then
+    OCF_RESKEY_aws_role="$1"; shift
+    export OCF_RESKEY_aws_role
+fi
+
+OCF_TYPE=AWS_Route
+OCF_RESOURCE_INSTANCE=${OCF_TYPE}_${OCF_RESKEY_table}_`echo "${OCF_RESKEY_destination}" | tr -d " \t" | cut -d '/' -f 1`
+export OCF_TYPE OCF_RESOURCE_INSTANCE
+
+ra_execocf  $1

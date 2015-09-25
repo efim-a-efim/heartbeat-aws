@@ -1,0 +1,186 @@
+#!/bin/sh
+#
+#
+#       Dummy OCF RA. Does nothing but wait a few seconds, can be
+#       configured to fail occassionally.
+#
+# Copyright (c) 2004 SUSE LINUX AG, Lars Marowsky-Br▒e
+#                    All Rights Reserved.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of version 2 of the GNU General Public License as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it would be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+#
+# Further, this software is distributed without any warranty that it is
+# free of the rightful claim of any third person regarding infringement
+# or the like.  Any license provided herein, whether implied or
+# otherwise, applies only to this software file.  Patent licenses, if
+# any, provided herein do not apply to combinations of this program with
+# other software, or any other product whatsoever.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write the Free Software Foundation,
+# Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
+#
+
+#######################################################################
+# Initialization:
+
+: ${OCF_FUNCTIONS_DIR=${OCF_ROOT}/resource.d/heartbeat}
+. ${OCF_FUNCTIONS_DIR}/.ocf-shellfuncs
+
+#######################################################################
+
+meta_data() {
+        cat <<END
+<?xml version="1.0"?>
+<!DOCTYPE resource-agent SYSTEM "ra-api-1.dtd">
+<resource-agent name="AWS_Route" version="0.9">
+<version>1.0</version>
+<longdesc lang="en">
+Change route in route table
+</longdesc>
+<shortdesc lang="en">AWS Route</shortdesc>
+
+<parameters>
+<parameter name="table" unique="1" required="1">
+<longdesc lang="en">Route Table ID</longdesc>
+<shortdesc lang="en">Route Table ID</shortdesc>
+<content type="string" default="" />
+</parameter>
+
+<parameter name="destination" unique="0" required="1">
+<longdesc lang="en">Destination CDIR block to replace route to</longdesc>
+<shortdesc lang="en">Route destination</shortdesc>
+<content type="string" default="" />
+</parameter>
+
+<parameter name="interface" unique="0" required="1">
+<longdesc lang="en">Network interface</longdesc>
+<shortdesc lang="en">Network interface</shortdesc>
+<content type="string" default="eth0" />
+</parameter>
+
+<parameter name="aws_role" unique="0" required="0">
+<longdesc lang="en">AWS IAM Role name</longdesc>
+<shortdesc lang="en">AWS IAM role</shortdesc>
+<content type="string" default="" />
+</parameter>
+
+</parameters>
+
+<actions>
+<action name="start"        timeout="20" />
+<action name="stop"         timeout="20" />
+<action name="monitor"      timeout="20" interval="10" depth="0" />
+<action name="reload"       timeout="20" />
+<action name="migrate_to"   timeout="20" />
+<action name="migrate_from" timeout="20" />
+<action name="meta-data"    timeout="5" />
+<action name="validate-all"   timeout="20" />
+</actions>
+</resource-agent>
+END
+}
+
+#######################################################################
+
+aws_set_env() {
+	export AWS_DEFAULT_REGION=`curl "http://169.254.169.254/latest/dynamic/instance-identity/document" 2>/dev/null | grep 'region' | tr -d ' ",' | cut -d ':' -f 2`
+	[ $? -ne 0 ] && return $OCF_ERR_GENERIC
+	export AWS_ACCESS_KEY_ID=`curl "http://169.254.169.254/latest/meta-data/iam/security-credentials/${OCF_RESKEY_aws_role}" 2>/dev/null | grep 'AccessKeyId' | tr -d ' ",' | cut -d ':' -f 2`
+	[ $? -ne 0 ] && return $OCF_ERR_GENERIC
+	export AWS_SECRET_ACCESS_KEY=`curl "http://169.254.169.254/latest/meta-data/iam/security-credentials/${OCF_RESKEY_aws_role}" 2>/dev/null | grep 'SecretAccessKey' | tr -d ' ",' | cut -d ':' -f 2`
+	[ $? -ne 0 ] && return $OCF_ERR_GENERIC
+	export AWS_SECURITY_TOKEN=`curl "http://169.254.169.254/latest/meta-data/iam/security-credentials/${OCF_RESKEY_aws_role}" 2>/dev/null | grep 'Token' | tr -d ' ",' | cut -d ':' -f 2`
+	[ $? -ne 0 ] && return $OCF_ERR_GENERIC
+	
+    _mac=`ip a l dev ${OCF_RESKEY_interface} | grep 'link/ether' | tr -s ' ' | cut -d ' ' -f 3`
+    [ $? -ne 0 ] && return $OCF_ERR_GENERIC
+    AWS_IFACE=`aws ec2 describe-network-interfaces --region "${AWS_DEFAULT_REGION}" --filters "Name=mac-address,Values=${_mac}" | grep 'NetworkInterfaceId' | tr -d ' ",' | cut -d ':' -f 2`
+    [ $? -ne 0 ] && return $OCF_ERR_GENERIC
+    export AWS_IFACE
+    return $OCF_SUCCESS
+}
+
+aws_ip_usage() {
+        cat <<END
+usage: $0 {start|stop|monitor|migrate_to|migrate_from|validate-all|meta-data}
+
+Expects to have a fully populated OCF RA-compliant environment set.
+END
+}
+
+aws_ip_start() {
+        aws_ip_monitor
+        [ $? =  $OCF_SUCCESS ] && return $OCF_SUCCESS
+        if aws ec2 replace-route --region "${AWS_DEFAULT_REGION}" --route-table-id "${OCF_RESKEY_table}" --destination-cidr-block "${OCF_RESKEY_destination}"  --network-interface-id "${AWS_IFACE}"; then
+                return $OCF_SUCCESS
+        fi
+        return $OCF_ERR_GENERIC
+}
+
+aws_ip_stop() {
+        aws_ip_monitor
+        ocf_log debug "${OCF_RESOURCE_INSTANCE} stop request received"
+        return $OCF_ERR_GENERIC
+}
+
+aws_ip_monitor() {
+        # Monitor _MUST!_ differentiate correctly between running
+        # (SUCCESS), failed (ERROR) or _cleanly_ stopped (NOT RUNNING).
+        # That is THREE states, not just yes/no.
+        _res=`aws ec2 describe-route-tables --region "${AWS_DEFAULT_REGION}" --route-table-ids "${OCF_RESKEY_table}" --filters Name=route.network-interface-id,Values=${AWS_IFACE} Name=route.destination-cidr-block,Values=${OCF_RESKEY_destination} | grep "${OCF_RESKEY_table}"`
+		[ $? -ne 0 ] && return $OCF_ERR_GENERIC
+        if [ "${_res}" ]; then
+                return $OCF_SUCCESS
+        fi
+        return $OCF_NOT_RUNNING
+}
+
+aws_ip_validate() {
+# Is the state directory writable?
+#    state_dir=`dirname "$OCF_RESKEY_state"`
+#    touch "$state_dir/$$"
+#    if [ $? != 0 ]; then
+#               return $OCF_ERR_ARGS
+#    fi
+#    rm "$state_dir/$$"
+# Check if there's a needed CDIR block in route table
+	_res=`aws ec2 describe-route-tables --region "${AWS_DEFAULT_REGION}" --route-table-ids "${OCF_RESKEY_table}" | grep "${OCF_RESKEY_destination}"`
+	[ $? -ne 0 ] && return $OCF_ERR_GENERIC
+	[ -z "${_res}" ] && return $OCF_ERR_CONFIGURED
+	return $OCF_SUCCESS
+}
+
+case $__OCF_ACTION in
+meta-data)      meta_data
+                exit $OCF_SUCCESS
+                ;;
+start)          aws_set_env && aws_ip_start;;
+stop)           aws_set_env && aws_ip_stop;;
+monitor)        aws_set_env && aws_ip_monitor;;
+migrate_to)     ocf_log info "Migrating ${OCF_RESOURCE_INSTANCE} to ${OCF_RESKEY_CRM_meta_migrate_target}."
+                aws_set_env && aws_ip_stop
+                ;;
+migrate_from)   ocf_log info "Migrating ${OCF_RESOURCE_INSTANCE} from ${OCF_RESKEY_CRM_meta_migrate_source}."
+                aws_set_env && aws_ip_start
+                ;;
+reload)         ocf_log info "Reloading ${OCF_RESOURCE_INSTANCE} ..."
+                ;;
+validate-all)   aws_set_env && aws_ip_validate;;
+usage|help)     aws_ip_usage
+                exit $OCF_SUCCESS
+                ;;
+*)              aws_ip_usage
+                exit $OCF_ERR_UNIMPLEMENTED
+                ;;
+esac
+rc=$?
+ocf_log debug "${OCF_RESOURCE_INSTANCE} $__OCF_ACTION : $rc"
+exit $rc
+

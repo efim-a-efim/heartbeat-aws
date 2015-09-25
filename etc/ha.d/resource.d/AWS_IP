@@ -1,0 +1,34 @@
+#!/bin/sh
+
+. /etc/ha.d/resource.d//hto-mapfuncs
+
+usage() {
+    echo "usage: $0 address interface AWS_IAM_ROLE $LEGAL_ACTIONS"
+    exit 1
+}
+
+# Check the arguments passed to this script
+if [ $# -lt 2 ]; then
+    usage
+fi
+
+if [ "x$2" != "x" ]; then
+    OCF_RESKEY_address="$1"; shift
+    export OCF_RESKEY_address
+fi
+
+if [ "x$2" != "x" ]; then
+    OCF_RESKEY_interface="$1"; shift 
+    export OCF_RESKEY_interface
+fi
+
+if [ "x$2" != "x" ]; then
+    OCF_RESKEY_aws_role="$1"; shift
+    export OCF_RESKEY_aws_role
+fi
+
+OCF_TYPE=AWS_IP
+OCF_RESOURCE_INSTANCE=${OCF_TYPE}_$OCF_RESKEY_address
+export OCF_TYPE OCF_RESOURCE_INSTANCE
+
+ra_execocf  $1
