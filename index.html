@@ -1,0 +1,110 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <title>Heartbeat-aws by efim-a-efim</title>
+    <link rel="stylesheet" href="stylesheets/styles.css">
+    <link rel="stylesheet" href="stylesheets/github-dark.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+    <script src="javascripts/respond.js"></script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <!--[if lt IE 8]>
+    <link rel="stylesheet" href="stylesheets/ie.css">
+    <![endif]-->
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+
+  </head>
+  <body>
+      <div id="header">
+        <nav>
+          <li class="fork"><a href="https://github.com/efim-a-efim/heartbeat-aws">View On GitHub</a></li>
+          <li class="downloads"><a href="https://github.com/efim-a-efim/heartbeat-aws/zipball/master">ZIP</a></li>
+          <li class="downloads"><a href="https://github.com/efim-a-efim/heartbeat-aws/tarball/master">TAR</a></li>
+          <li class="title">DOWNLOADS</li>
+        </nav>
+      </div><!-- end header -->
+
+    <div class="wrapper">
+
+      <section>
+        <div id="title">
+          <h1>Heartbeat-aws</h1>
+          <p>AWS resource agents for Heartbeat</p>
+          <hr>
+          <span class="credits left">Project maintained by <a href="https://github.com/efim-a-efim">efim-a-efim</a></span>
+          <span class="credits right">Hosted on GitHub Pages &mdash; Theme by <a href="https://twitter.com/michigangraham">mattgraham</a></span>
+        </div>
+
+        <p>OCF resource agents and scripts for Heartbeat to interact with AWS.</p>
+
+<p>Originaly, it was developed as a patch for VyOS to live in HA configuration in AWS.</p>
+
+<h2>
+<a id="installation-pre-requisties" class="anchor" href="#installation-pre-requisties" aria-hidden="true"><span class="octicon octicon-link"></span></a>Installation pre-requisties</h2>
+
+<ol>
+<li>You must install Amazon <strong>AWS tools</strong>. <code>aws</code> utility must be in <code>PATH</code>for user running heartbeat (e.g. <code>root</code>).</li>
+<li>You must launch your instance with AWS <strong>IAM role</strong>. This role must permit instance to list, edit, get properties of VPC route tables, IP addresses and Elastic IPs.</li>
+</ol>
+
+<h3>
+<a id="aws_ip-agent" class="anchor" href="#aws_ip-agent" aria-hidden="true"><span class="octicon octicon-link"></span></a>AWS_IP agent</h3>
+
+<p>Add Private IP to the active instance's interface.</p>
+
+<p>Parameters (in order of appearance):</p>
+
+<ol>
+<li>
+<code>address</code> - IP address to assign</li>
+<li>
+<code>interface</code> - network interface name (e.g. <code>eth0</code>, etc.)</li>
+<li>
+<code>aws_role</code> - IAM role name</li>
+</ol>
+
+<h3>
+<a id="aws_eip-agent" class="anchor" href="#aws_eip-agent" aria-hidden="true"><span class="octicon octicon-link"></span></a>AWS_EIP agent</h3>
+
+<p>Associate existing Elastic IP address with active instance's interface</p>
+
+<p>Parameters (in order of appearance):</p>
+
+<ol>
+<li>
+<code>address</code> - IP address to assign</li>
+<li>
+<code>interface</code> - network interface name (e.g. <code>eth0</code>, etc.)</li>
+<li>
+<code>privateip</code> - Private IP address. May be empty, then the first assigned address will be used.</li>
+<li>
+<code>aws_role</code> - IAM role name</li>
+</ol>
+
+<h3>
+<a id="aws_route-agent" class="anchor" href="#aws_route-agent" aria-hidden="true"><span class="octicon octicon-link"></span></a>AWS_Route agent</h3>
+
+<p>Change VPC route table to direct route through current instance's interface.</p>
+
+<p>Parameters (in order of appearance):</p>
+
+<ol>
+<li>
+<code>table</code> - Routing table ID</li>
+<li>
+<code>destination</code> - Route destination address/mask (e.g. <code>10.0.0.0/8</code>)</li>
+<li>
+<code>interface</code> - network interface name (e.g. <code>eth0</code>, etc.)</li>
+<li>
+<code>aws_role</code> - IAM role name</li>
+</ol>
+      </section>
+
+    </div>
+    <!--[if !IE]><script>fixScale(document);</script><![endif]-->
+    
+  </body>
+</html>
